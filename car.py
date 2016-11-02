@@ -11,18 +11,16 @@ from objects import *
 class Controller(object):
     def __init__(self, car):
         self.car = car
-        self.break_applied = False
-        self.gas_applied = False
 
     def take_action(self, dist, ped_vel, ped_pos):
         vel = ped_vel*1000.0
         print("CONTROLLER ACTION -- dist: {:.2f}, ped_vel: {}, ped_pos: {}".format(dist, vel, ped_pos))
 
-    def apply_break(self):
-        self.car.apply_break()
+    def apply_break(self, g=.7):
+        self.car.apply_break(g)
 
-    def apply_gas(self):
-        self.car.apply_gas()
+    def apply_gas(self, g=.25):
+        self.car.apply_gas(g)
 
 
 
@@ -76,7 +74,7 @@ class Sensor(object):
             self.car.impact = True
             if self.ped != None:
                 self.ped.impact = True
-            self.car.sim.abort_sim()
+            self.car.sim.stop()
         return impact
 
 
@@ -88,29 +86,39 @@ class Car(SpaceObject):
         self.depth = depth
         self.controller = Controller(self)
         self.sensor = Sensor(self)
-        self.timer = 0
+        self.sensor_timer = 0
+        self.last_dist = None
 
     def __str__(self):
         return "Name: {}, Pos: {}, Vel: {}, Hit Ped: {}".format(self.name, self.pos, self.velocity, self.impact)
 
-    def tick(self):
+    def tick_every_tick(self):
+        """
+        Operations done EVERY tick.
+        """
         # move the car and change the velocity by some amount (optional)
         self.move()
-        self.change_velocity()
 
-        # the below info is relayed from the sensor which only sends packets every 100ms
-        if self.timer < 100:
-            self.timer += 1
-            return
-        self.timer = 0
+        # stop the simulation once the distance between ped and the car gets further
+        # rather than closer -- The car has passed the ped safely
+        dist = self.sensor.get_distance()
+        if self.last_dist != None:
+            if dist > self.last_dist:
+                self.sim.stop()
+        self.last_dist = dist
 
+        # check to see if impact with ped has occured after moving
+        self.impact = self.sensor.check_impact()
+
+    def tick_sensor_packets(self):
+        """
+        Operations done when the car recieves packets from the sensor.
+        Every 100 ms.
+        """
         # get the distance and the relative velocity to the ped
         dist = self.sensor.get_distance()
         ped_vel = self.sensor.get_ped_velocity()
         ped_pos = self.sensor.get_ped_pos_rel()
-
-        # check to see if impact with ped has occured after moving
-        self.impact = self.sensor.check_impact()
 
         # print the car position for tesing
         print("\nCar Pos: {}".format(self.pos))
@@ -125,11 +133,34 @@ class Car(SpaceObject):
         # ped is found and we need to take action
         self.controller.take_action(dist, ped_vel, ped_pos)
 
-    def change_velocity(self):
-        pass
+    def tick(self):
+        # Do the operations that happen EVERY tick
+        self.tick_every_tick()
 
-    def apply_break(self):
-        pass
+        # the below info is relayed from the sensor which only sends packets every 100ms
+        if self.sensor_timer < 100:
+            self.sensor_timer += 1
+            return
+        self.sensor_timer = 0
 
-    def apply_gas(self):
-        pass
+        # Do the operations that happen on ticks sensor info is recieved
+        self.tick_sensor_packets()
+
+    def apply_break(self, g=.7):
+        """
+        Apply the break to the car. .7*G is the MAX deceleration.
+        \param: g is the fraction of G to apply where G=9.81m/s^2
+        """
+        if g > .7:
+            g = .7
+        self.acceleration = self.G*g/1000.0
+
+    def apply_gas(self, g=.25):
+        """
+        Apply the gas to the car up to the steady state speed.
+        .25*G is the MAX accelleration.
+        \param: g is the fraction of G where G=9.81m/s^2
+        """
+        if g > .25:
+            g = .25
+        self.acceleration = self.G*g/1000.0
