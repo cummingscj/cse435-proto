@@ -20,7 +20,7 @@ class SpaceObject(object):
         self.impact = False
         self.sim = sim
         self.G = 9.81
-        self.acceleration = Acceleration()
+        self.acceleration = Velocity()
 
     def get_dist(self, space_object):
         """
@@ -60,7 +60,7 @@ class SpaceObject(object):
         self.velocity += self.acceleration # accelleration is mm/s every second == mm/s^2
         if self.velocity > self.steady_state_velocity:
             self.velocity = self.steady_state_velocity
-            self.acceleration = Acceleration()
+            self.acceleration = Velocity()
         pos = Pos(self.velocity.dx, self.velocity.dy, self.velocity.dz)
         self.pos += pos
 
@@ -95,6 +95,16 @@ class Pos(object):
 
     def __repr__(self):
         return self.__str__()
+
+    def dist_to(self, pos):
+        """
+        Distance to the next pos.
+        """
+        p = Pos(pos.x - self.x, pos.y - self.y, pos.z - self.z)
+        return p.dist_from_orig()
+
+    def dist_from_orig(self):
+        return math.sqrt(self.x**2 + self.y**2 + self.z**2)
 
 
 class Velocity(object):
@@ -149,19 +159,12 @@ class Velocity(object):
         r = self.dx**2 + self.dy**2 + self.dz**2
         return math.sqrt(r)
 
-
-class Acceleration(Velocity):
-    def __init__(self, x=0, y=0, z=0):
-        super(Acceleration, self).__init__(x, y, z)
-
-    def __str__(self):
-        return "Acl<{:.2f}, {:.2f}, {:.2f}>".format(self.dx, self.dy, self.dz)
-
-    def speed(self):
-        raise NotImplimentedError("Speed", "Acceleration")
-
-    def velocity(self):
-        return super(Acceleration, self).speed()
+    def unit_vector(self):
+        """
+        Return the velocity as a unit vector.
+        """
+        s = 1/self.speed()
+        return s*self
 
 
 class NotImplimentedError(Exception):

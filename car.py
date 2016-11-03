@@ -12,9 +12,52 @@ class Controller(object):
     def __init__(self, car):
         self.car = car
 
-    def take_action(self, dist, ped_vel, ped_pos):
+    def take_action(self, ped_vel, ped_pos):
+        probability = self.p_hit_ped(ped_pos, ped_vel)
         vel = ped_vel*1000.0
-        print("CONTROLLER ACTION -- dist: {:.2f}, ped_vel: {}, ped_pos: {}".format(dist, vel, ped_pos))
+        print("CONTROLLER ACTION -- dist: {:.2f}, ped_vel: {}, ped_pos: {}".format(ped_pos.dist_from_orig(), vel, ped_pos))
+
+    def p_hit_ped(self, ped_pos, ped_vel):
+        """
+        Return the probability of the car hitting the pedestrian.
+        """
+        dist = ped_pos.dist_from_orig() # current distance from car
+
+        # Get projections 100ms from now
+        ped_proj_rel_to_car_now = self.projection(ped_pos, ped_vel, 100)
+        car_proj_hundred = self.projection(Pos(), self.car.velocity, 100)
+
+        # Get the projected resultant vector (next ped_pos to be called...)
+        next_rel_vector = ped_proj_rel_to_car_now - car_proj_hundred
+
+        # Get the distance for the next projected ped_pos
+        next_dist = next_rel_vector.dist_from_orig()
+
+        # Add in error for worst case...
+        next_dist -= .5
+
+        # Get the rate in which we are approaching mm/ms
+        rate = (dist - next_dist)/100
+
+        # Time to impact
+        time_to_impact = dist/rate
+
+        # Document the rate we are approaching
+        self.car.sim.approach_rate_graph.append(rate*1000)
+
+        print("Time until impact (ms): {:.4f}".format(time_to_impact))
+        print("Current distance (m): {:.2f}".format(dist))
+        print("100ms from now distance (worst case) (m): {:.2f}".format(next_dist))
+        print("Rate we are approaching (m/s): {:.4f}".format(rate*1000))
+        
+    def projection(self, pos, vel, time):
+        """
+        \param time: time in ms for projection
+        """
+        x = pos.x + (vel.dx*time)
+        y = pos.y + (vel.dy*time)
+        z = pos.z + (vel.dz*time)
+        return Pos(x, y, z)
 
     def apply_break(self, g=.7):
         self.car.apply_break(g)
@@ -88,6 +131,7 @@ class Car(SpaceObject):
         self.sensor = Sensor(self)
         self.sensor_timer = 0
         self.last_dist = None
+        self.break_on = False
 
     def __str__(self):
         return "Name: {}, Pos: {}, Vel: {}, Hit Ped: {}".format(self.name, self.pos, self.velocity, self.impact)
@@ -131,7 +175,7 @@ class Car(SpaceObject):
             return
         
         # ped is found and we need to take action
-        self.controller.take_action(dist, ped_vel, ped_pos)
+        self.controller.take_action(ped_vel, ped_pos)
 
     def tick(self):
         # Do the operations that happen EVERY tick
@@ -153,7 +197,9 @@ class Car(SpaceObject):
         """
         if g > .7:
             g = .7
-        self.acceleration = self.G*g/1000.0
+        unit_vel_vector = self.velocity.unit_vecor() # get the direction.
+        self.acceleration = ((self.G*g*-1)/1000.0)*unit_vel_vector
+        self.break_on = True
 
     def apply_gas(self, g=.25):
         """
@@ -163,4 +209,6 @@ class Car(SpaceObject):
         """
         if g > .25:
             g = .25
-        self.acceleration = self.G*g/1000.0
+        unit_vel_vector = self.velocity.unit_vecor() # get the direction.
+        self.acceleration = ((self.G*g)/1000.0)*unit_vel_vector
+        self.break_on = False

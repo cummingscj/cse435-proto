@@ -11,7 +11,7 @@ import plotly.graph_objs as go
 
 class LineGraph(object):
 
-	def __init__(self, ped_info, car_info, time):
+	def __init__(self, rate, ped_info, car_info, time):
 		self.time = time
 		self.car_info = car_info
 		self.ped_info = ped_info
@@ -19,6 +19,7 @@ class LineGraph(object):
 		self.car_pos = list()
 		self.ped_speed = list()
 		self.car_speed = list()
+		self.rates = rate
 		self.get_info()
 		self.display()
 
@@ -36,6 +37,29 @@ class LineGraph(object):
 		"""
 		self.make_pos_graph()
 		self.make_speed_graph()
+		self.make_rate_graph()
+
+	def make_rate_graph(self):
+		time = [i for i in range(self.time)]
+			
+		trace0 = go.Scatter(
+			x = time,
+			y = self.rates,
+			name = 'Rate of Approach',
+			line = dict(
+				color = ('rgb(0, 20, 200)'),
+				width = 4)
+		)
+
+		data = [trace0]
+
+		layout = dict(title = 'Rate at which the car approaches the pedestrian',
+			xaxis = dict(title = 'Time (s)'),
+			yaxis = dict(title = 'Rate (m/s)'),
+			)
+
+		fig = dict(data=data, layout=layout)
+		plotly.offline.plot(fig, filename='rate-graph.html')
 
 	def make_speed_graph(self):
 		"""
@@ -64,7 +88,7 @@ class LineGraph(object):
 		data = [trace0, trace1]
 
 		layout = dict(title = 'Speed Graph for Car vs Pedestrian',
-			xaxis = dict(title = 'Time (ms)'),
+			xaxis = dict(title = 'Time (s)'),
 			yaxis = dict(title = 'Speed (m/s)'),
 			)
 

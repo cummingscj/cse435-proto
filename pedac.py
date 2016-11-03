@@ -26,6 +26,7 @@ class Simulation(object):
         self.abort = False
         self.total_time = None
         self.options = [i.lower() for i in options]
+        self.approach_rate_graph = list()
 
     def add_car(self, name, x, y, dx, dy, z=0, dz=0, width=2, depth=2):
         """
@@ -102,7 +103,7 @@ class Simulation(object):
         print(self.pedestrian)
         print("Total time: {} seconds".format(self.total_time/1000.0))
         if '--graph' in self.options:
-            LineGraph(self.track_ped, self.track_car, self.total_time)
+            LineGraph(self.approach_rate_graph, self.track_ped, self.track_car, self.total_time)
         self.try_file_out()
 
     def try_file_out(self):
@@ -116,8 +117,7 @@ class Simulation(object):
                 break
         if file == None:
             return
-        print(opt)
-        opt = opt.split('=')
+        opt = file.split('=')
         if len(opt) < 2:
             return
         file = opt[1]
