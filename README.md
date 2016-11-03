@@ -11,8 +11,8 @@ https://plot.ly/python/getting-started/#installation
 ### Usage
 python pedac.py [--graph] [--file=filename] [>filename]
 
---graph : Create html graphs with plotly that are displayed in your default browser.
+'--graph' : Create html graphs with plotly that are displayed in your default browser.
 
---file=filename : Put data from simulation into file specified by 'filename'
+'--file=filename' : Put data from simulation into file specified by 'filename'
 
->filename : Put the simulation shell results in the file specified by 'filename'
+'>filename' : Put the simulation shell results in the file specified by 'filename'
