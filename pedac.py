@@ -5,6 +5,7 @@
 #
 #######################################################
 
+import sys
 import time
 from ped import *
 from car import *
@@ -14,7 +15,7 @@ class Simulation(object):
     """
     Simulation Object
     """
-    def __init__(self, name, time_out=1000000):
+    def __init__(self, name, options=list(), time_out=1000000):
         self.name = name
         self.simulated = False
         self.car = None
@@ -24,6 +25,7 @@ class Simulation(object):
         self.time_out_value = time_out # time out at 1000 seconds by default
         self.abort = False
         self.total_time = None
+        self.options = [i.lower() for i in options]
 
     def add_car(self, name, x, y, dx, dy, z=0, dz=0, width=2, depth=2):
         """
@@ -99,7 +101,33 @@ class Simulation(object):
         print(self.car)
         print(self.pedestrian)
         print("Total time: {} seconds".format(self.total_time/1000.0))
-        LineGraph(self.track_ped, self.track_car, self.total_time)
+        if '--graph' in self.options:
+            LineGraph(self.track_ped, self.track_car, self.total_time)
+        self.try_file_out()
+
+    def try_file_out(self):
+        """
+        Output information in an output file of the users choosing.
+        """
+        file = None
+        for opt in self.options:
+            if '--file' in opt:
+                file = opt
+                break
+        if file == None:
+            return
+        print(opt)
+        opt = opt.split('=')
+        if len(opt) < 2:
+            return
+        file = opt[1]
+        with open(file, 'w') as export:
+            print(self.track_ped, file=export)
+            print(self.track_car, file=export)
+            print(self.total_time, file=export)
+
+
+OPTIONS = list()
 
 
 def get_milli():
@@ -109,8 +137,23 @@ def get_milli():
     return int(round(time.time()*1000))
 
 
+def populate_options():
+    """
+    Put user specified options into the simulation.
+    """
+    global OPTIONS
+    if len(sys.argv) > 1:
+        for i in range(1, len(sys.argv)):
+            OPTIONS.append(sys.argv[i])
+
+
 def main():
-    sim = Simulation("Case1")
+    """
+    Main function for the simulations.
+    """
+    global OPTIONS
+    populate_options()
+    sim = Simulation("Case1", options=OPTIONS)
     sim.add_car("car", 0, 0, 13.9, 0) # car starts at (0, 0) with velocity in positive x at 13.9m/s
     sim.add_pedestrian("ped", 35, -7, 0, 1.67) # ped at (35, -7) with velocity in positive y at 1.67m/s
     sim.run()
