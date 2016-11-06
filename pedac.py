@@ -103,7 +103,8 @@ class Simulation(object):
         print(self.pedestrian)
         print("Total time: {} seconds".format(self.total_time/1000.0))
         if '--graph' in self.options:
-            LineGraph(self.approach_rate_graph, self.track_ped, self.track_car, self.total_time)
+            LineGraph(self.approach_rate_graph, self.track_ped, self.track_car, self.total_time,
+                self.car.acceleration_graph, self.car.distance_to_ped_graph)
         self.try_file_out()
 
     def try_file_out(self):
@@ -155,7 +156,7 @@ def main():
     populate_options()
     sim = Simulation("Case1", options=OPTIONS)
     sim.add_car("car", 0, 0, 13.9, 0) # car starts at (0, 0) with velocity in positive x at 13.9m/s
-    sim.add_pedestrian("ped", 35, -7, 0, 1.67) # ped at (35, -7) with velocity in positive y at 1.67m/s
+    sim.add_pedestrian("ped", 35, 0, 0, 0) # ped at (35, -7) with velocity in positive y at 1.67m/s
     sim.run()
     sim.view_results()
 

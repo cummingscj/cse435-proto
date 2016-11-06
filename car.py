@@ -12,10 +12,44 @@ class Controller(object):
     def __init__(self, car):
         self.car = car
 
+    def algorithm(self, time_to_impact, time_to_stop, current_dist,
+            car_speed, projected_dist, rate_approaching):
+        """
+        This is the main algorithm for the controller.
+        Everything given is in s, m, or m/s
+        \return apply_break: Should the car apply some break?
+        \return how_much: the fraction of max g the car should accelerate by.
+        """
+
+        apply_break = False
+        how_much = None
+
+        dist_to_stop = (6.867/2)*time_to_stop**2
+
+        if dist_to_stop > projected_dist:
+            apply_break = True
+            how_much = (dist_to_stop/projected_dist)*.7*.02
+        else:
+            if car_speed < self.car.steady_state_velocity.speed():
+                how_much = .25
+
+
+        return apply_break, how_much
+
     def take_action(self, ped_vel, ped_pos):
-        probability = self.p_hit_ped(ped_pos, ped_vel)
-        vel = ped_vel*1000.0
-        print("CONTROLLER ACTION -- dist: {:.2f}, ped_vel: {}, ped_pos: {}".format(ped_pos.dist_from_orig(), vel, ped_pos))
+        #if self.car.velocity.speed() == self.car.steady_state_velocity.speed():
+        #    self.apply_break(.008)
+
+        #if self.car.velocity.speed()*1000.0 < 10:
+        #    self.apply_gas()
+
+        apply_break, how_much = self.p_hit_ped(ped_pos, ped_vel)
+
+        if apply_break:
+            self.apply_break(how_much)
+        else:
+            if how_much != None:
+                self.apply_gas(how_much)
 
     def p_hit_ped(self, ped_pos, ped_vel):
         """
@@ -34,21 +68,37 @@ class Controller(object):
         next_dist = next_rel_vector.dist_from_orig()
 
         # Add in error for worst case...
-        next_dist -= .5
+        #next_dist -= .5
 
         # Get the rate in which we are approaching mm/ms
         rate = (dist - next_dist)/100
 
-        # Time to impact
-        time_to_impact = dist/rate
+        # Time to impact s
+        time_to_impact = dist/(rate*1000)
+
+        # Time it takes to stop ms (at max break)
+        max_decell = self.car.G*.7/1000.0
+        tts = self.car.velocity.speed()/max_decell # (mm/ms)/(mm/ms^2)=ms
 
         # Document the rate we are approaching
         self.car.sim.approach_rate_graph.append(rate*1000)
 
-        print("Time until impact (ms): {:.4f}".format(time_to_impact))
-        print("Current distance (m): {:.2f}".format(dist))
-        print("100ms from now distance (worst case) (m): {:.2f}".format(next_dist))
-        print("Rate we are approaching (m/s): {:.4f}".format(rate*1000))
+        print("\n\nCar pos: ********************************** {:<30} (m)".format(str(self.car.pos)))
+        print("Ped pos: ********************************** {:<30} (m)".format(str(self.car.sensor.ped.pos)))
+        print("Ped pos relative to car: ****************** {:<30} (m)".format(str(ped_pos)))
+        print("Car velocity vector: ********************** {:<30} (m/s)".format(str(self.car.velocity*1000)))
+        print("Ped velocity vector: ********************** {:<30} (m/s)".format(str(ped_vel*1000)))
+        print("Time until impact: ************************ {:<30.4f} (s)".format(time_to_impact))
+        print("Time it will take to stop at max break: *** {:<30.4f} (s)".format(tts))
+        print("Current distance: ************************* {:<30.2f} (m)".format(dist))
+        print("100ms from now distance (best guess): ***** {:<30.2f} (m)".format(next_dist))
+        print("Current car speed: ************************ {:<30.2f} (m/s)".format(self.car.velocity.speed()*1000))
+        print("Rate we are approaching (best guess): ***** {:<30.4f} (m/s)".format(rate*1000))
+        print("\nTime: {:.4f} (s)".format(self.car.time/1000.0))
+        print("\n________________________________________________________________________________")
+
+        return self.algorithm(time_to_impact, tts, dist, self.car.velocity.speed()*1000,
+            next_dist, rate*1000)
         
     def projection(self, pos, vel, time):
         """
@@ -132,6 +182,9 @@ class Car(SpaceObject):
         self.sensor_timer = 0
         self.last_dist = None
         self.break_on = False
+        self.acceleration_graph = list()
+        self.distance_to_ped_graph = list()
+        self.time = 0 # time in ms
 
     def __str__(self):
         return "Name: {}, Pos: {}, Vel: {}, Hit Ped: {}".format(self.name, self.pos, self.velocity, self.impact)
@@ -142,11 +195,22 @@ class Car(SpaceObject):
         """
         # move the car and change the velocity by some amount (optional)
         self.move()
+        self.time += 1
+
+        # document the cars acceleration
+        acc = self.acceleration.speed()
+        self.acceleration_graph.append(acc)
+
+        # document the distance to the pedestrian
+        di = self.sensor.get_distance()
+        if di == None:
+            di = 0
+        self.distance_to_ped_graph.append(di)
 
         # stop the simulation once the distance between ped and the car gets further
         # rather than closer -- The car has passed the ped safely
         dist = self.sensor.get_distance()
-        if self.last_dist != None:
+        if self.last_dist != None and dist < 10:
             if dist > self.last_dist:
                 self.sim.stop()
         self.last_dist = dist
@@ -163,11 +227,6 @@ class Car(SpaceObject):
         dist = self.sensor.get_distance()
         ped_vel = self.sensor.get_ped_velocity()
         ped_pos = self.sensor.get_ped_pos_rel()
-
-        # print the car position for tesing
-        print("\nCar Pos: {}".format(self.pos))
-        if self.sensor.ped != None:
-            print("Ped Pos: {}".format(self.sensor.ped.pos))
         
         if dist == None or ped_vel == None:
             # No ped found yet
@@ -197,7 +256,7 @@ class Car(SpaceObject):
         """
         if g > .7:
             g = .7
-        unit_vel_vector = self.velocity.unit_vecor() # get the direction.
+        unit_vel_vector = self.velocity.unit_vector() # get the direction.
         self.acceleration = ((self.G*g*-1)/1000.0)*unit_vel_vector
         self.break_on = True
 
@@ -209,6 +268,6 @@ class Car(SpaceObject):
         """
         if g > .25:
             g = .25
-        unit_vel_vector = self.velocity.unit_vecor() # get the direction.
+        unit_vel_vector = self.velocity.unit_vector() # get the direction.
         self.acceleration = ((self.G*g)/1000.0)*unit_vel_vector
         self.break_on = False

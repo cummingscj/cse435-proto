@@ -11,7 +11,7 @@ import plotly.graph_objs as go
 
 class LineGraph(object):
 
-	def __init__(self, rate, ped_info, car_info, time):
+	def __init__(self, rate, ped_info, car_info, time, acceleration, distance):
 		self.time = time
 		self.car_info = car_info
 		self.ped_info = ped_info
@@ -20,6 +20,8 @@ class LineGraph(object):
 		self.ped_speed = list()
 		self.car_speed = list()
 		self.rates = rate
+		self.acceleration = [i*1000 for i in acceleration]
+		self.distance = distance
 		self.get_info()
 		self.display()
 
@@ -36,8 +38,32 @@ class LineGraph(object):
 		Display the info in graphs.
 		"""
 		self.make_pos_graph()
+		self.make_dist_to_ped_graph()
 		self.make_speed_graph()
 		self.make_rate_graph()
+		self.make_acceleration_graph()
+
+	def make_acceleration_graph(self):
+		time = [i for i in range(self.time)]
+			
+		trace0 = go.Scatter(
+			x = time,
+			y = self.acceleration,
+			name = 'Acceleration of the Car',
+			line = dict(
+				color = ('rgb(0, 20, 200)'),
+				width = 4)
+		)
+
+		data = [trace0]
+
+		layout = dict(title = 'Magnitude of Acceleration vs Time of the Car',
+			xaxis = dict(title = 'Time (s * 10)'),
+			yaxis = dict(title = '|Acceleration| (m/s^2)'),
+			)
+
+		fig = dict(data=data, layout=layout)
+		plotly.offline.plot(fig, filename='acceleration-graph.html')
 
 	def make_rate_graph(self):
 		time = [i for i in range(self.time)]
@@ -54,7 +80,7 @@ class LineGraph(object):
 		data = [trace0]
 
 		layout = dict(title = 'Rate at which the car approaches the pedestrian',
-			xaxis = dict(title = 'Time (s)'),
+			xaxis = dict(title = 'Time (s * 10)'),
 			yaxis = dict(title = 'Rate (m/s)'),
 			)
 
@@ -88,17 +114,44 @@ class LineGraph(object):
 		data = [trace0, trace1]
 
 		layout = dict(title = 'Speed Graph for Car vs Pedestrian',
-			xaxis = dict(title = 'Time (s)'),
-			yaxis = dict(title = 'Speed (m/s)'),
+			xaxis = dict(title = 'Time (ms)'),
+			yaxis = dict(title = 'Speed (m/s) -- |V|'),
 			)
 
 		fig = dict(data=data, layout=layout)
 		plotly.offline.plot(fig, filename='speed-graph.html')
 
+	def make_dist_to_ped_graph(self):
+		"""
+		The distance between the car and the ped over time.
+		"""
+		time = [i for i in range(self.time)]
+
+		trace0 = go.Scatter(
+			x = time,
+			y = self.distance,
+			name = 'Distance',
+			line = dict(
+				color = ('rgb(0, 20, 200)'),
+				width = 4)
+		)
+
+		data = [trace0]
+
+		layout = dict(title = 'Distance Between the Car and Pedestrian Over Time',
+			xaxis = dict(title = 'Time (ms)'),
+			yaxis = dict(title = 'Distance (m)'),
+			)
+
+		fig = dict(data=data, layout=layout)
+		plotly.offline.plot(fig, filename='distance-graph.html')
+
 	def make_pos_graph(self):
 		"""
 		Positional graph.
 		"""
+		time = [i for i in range(self.time)]
+
 		car_x = [i[0] for i in self.car_pos]
 		car_y = [i[1] for i in self.car_pos]
 
@@ -106,18 +159,18 @@ class LineGraph(object):
 		ped_y = [i[1] for i in self.ped_pos]
 
 		trace0 = go.Scatter(
-			x = car_x,
-			y = car_y,
-			name = 'Car Position',
+			x = time,
+			y = car_x,
+			name = 'Car X Position',
 			line = dict(
 				color = ('rgb(0, 20, 200)'),
 				width = 4)
 		)
 
 		trace1 = go.Scatter(
-			x = ped_x,
-			y = ped_y,
-			name = 'Pedestrian Position',
+			x = time,
+			y = ped_x,
+			name = 'Pedestrian X Position',
 			line = dict(
 				color = ('rgb(0, 200, 5)'),
 				width = 4)
@@ -125,10 +178,38 @@ class LineGraph(object):
 
 		data = [trace0, trace1]
 
-		layout = dict(title = 'Positional Graph for Car vs Pedestrian',
-			xaxis = dict(title = 'X Coordinate'),
-			yaxis = dict(title = 'Y Coordinate'),
+		layout = dict(title = 'X Position of the Car and Pedestrian Over Time',
+			xaxis = dict(title = 'Time (ms)'),
+			yaxis = dict(title = 'X Coordinates'),
 			)
 
 		fig = dict(data=data, layout=layout)
-		plotly.offline.plot(fig, filename='positional-graph.html')
+		plotly.offline.plot(fig, filename='x-positional-graph.html')
+
+		trace0 = go.Scatter(
+			x = time,
+			y = car_y,
+			name = 'Car Y Position',
+			line = dict(
+				color = ('rgb(0, 20, 200)'),
+				width = 4)
+		)
+
+		trace1 = go.Scatter(
+			x = time,
+			y = ped_y,
+			name = 'Pedestrian Y Position',
+			line = dict(
+				color = ('rgb(0, 200, 5)'),
+				width = 4)
+		)
+
+		data = [trace0, trace1]
+
+		layout = dict(title = 'Y Position of the Car and Pedestrian Over Time',
+			xaxis = dict(title = 'Time (ms)'),
+			yaxis = dict(title = 'Y Coordinates'),
+			)
+
+		fig = dict(data=data, layout=layout)
+		plotly.offline.plot(fig, filename='y-positional-graph.html')
