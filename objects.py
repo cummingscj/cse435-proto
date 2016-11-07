@@ -21,6 +21,8 @@ class SpaceObject(object):
         self.sim = sim
         self.G = 9.81
         self.acceleration = Velocity()
+        self.path = None
+        self.time = 0 # Time in ms
 
     def get_dist(self, space_object):
         """
@@ -57,6 +59,12 @@ class SpaceObject(object):
         """
         Move this space object by the velocity. Called every millisecond.
         """
+        if self.path != None:
+            for transition in self.path.path:
+                if transition.time == self.time:
+                    self.velocity = transition.velocity()
+                    self.acceleration = transition.acceleration()
+
         self.velocity += self.acceleration # accelleration is mm/s every second == mm/s^2
         if self.velocity > self.steady_state_velocity:
             self.velocity = self.steady_state_velocity
@@ -70,6 +78,70 @@ class SpaceObject(object):
         """
         # This is the child class responsibility
         raise NotImplimentedError("Area")
+
+
+class PathTransition(object):
+    def __init__(self, time, nVel, nAcc):
+        self.time = time
+        self.new_vel = nVel
+        self.new_acc = nAcc
+
+    def __str__(self):
+        return "Time: {}, New Vel: {}, New Acc: {}".format(self.time, self.new_vel, self.new_acc)
+
+    def __repr__(self):
+        return self.__str__()
+
+    def velocity(self):
+        return self.new_vel
+
+    def acceleration(self):
+        return self.new_acc
+
+
+class SpaceObjectPath(object):
+    def __init__(self, name, file):
+        self.name = name
+        self.file = file
+        self.path = list()
+        self.init_path()
+        self.valid = False
+
+    def __str__(self):
+        return '{->' + self.name + ": " + str(self.path) + '<-}'
+
+    def init_path(self):
+        try:
+            with open(self.file, 'r') as file:
+                lines = file.read().splitlines()
+                for line in lines:
+                    self.process(line)
+            self.valid = True
+        except:
+            print("Error reading in path: File not recieved well.")
+
+    def process(self, line):
+        params = line.split()
+        params = [i.lower() for i in params]
+        time = 0
+        vel = Velocity()
+        acc = Velocity()
+        for param in params:
+            if 'time:' in param:
+                time = float(param.split(':')[1])
+            elif 'velx:' in param:
+                vel.dx = float(param.split(':')[1])/1000.0
+            elif 'vely:' in param:
+                vel.dy = float(param.split(':')[1])/1000.0
+            elif 'velz:' in param:
+                vel.dz = float(param.split(':')[1])/1000.0
+            elif 'accx:' in param:
+                acc.dx = float(param.split(':')[1])/1000.0
+            elif 'accy:' in param:
+                acc.dy = float(param.split(':')[1])/1000.0
+            elif 'accz:' in param:
+                acc.dz = float(param.split(':')[1])/1000.0
+        self.path.append(PathTransition(time, vel, acc))
 
 
 class Pos(object):

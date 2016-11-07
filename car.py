@@ -88,7 +88,7 @@ class Controller(object):
         print("Ped pos relative to car: ****************** {:<30} (m)".format(str(ped_pos)))
         print("Car velocity vector: ********************** {:<30} (m/s)".format(str(self.car.velocity*1000)))
         print("Ped velocity vector: ********************** {:<30} (m/s)".format(str(ped_vel*1000)))
-        print("Time until impact: ************************ {:<30.4f} (s)".format(time_to_impact))
+        print("Time until impact (best guess): *********** {:<30.4f} (s)".format(time_to_impact))
         print("Time it will take to stop at max break: *** {:<30.4f} (s)".format(tts))
         print("Current distance: ************************* {:<30.2f} (m)".format(dist))
         print("100ms from now distance (best guess): ***** {:<30.2f} (m)".format(next_dist))
@@ -158,11 +158,12 @@ class Sensor(object):
         Did the car hit the pedestrian?
         """
         impact = False
-        dist = self.get_distance()
-        if dist != None:
-            if self.ped != None:
-                if dist <= self.ped.radius:
+        if self.ped != None:
+            if self.ped.pos.x <= self.car.pos.x:
+                if (self.ped.pos.y <= self.car.pos.y + self.car.width/2) and \
+                    (self.ped.pos.y >= self.car.pos.y - self.car.width/2):
                     impact = True
+
         if impact:
             self.car.impact = True
             if self.ped != None:
@@ -170,6 +171,44 @@ class Sensor(object):
             self.car.sim.stop()
         return impact
 
+    def check_safe(self):
+        """
+        Did the car pass the pedestrian safely?
+        """
+        stop = False
+
+        if self.ped != None:
+            if self.car.pos.x > self.ped.pos.x + self.car.safety_buffer and not self.car.impact:
+                stop = True
+
+        if stop:
+            self.car.sim.stop()
+
+
+
+class EfficiencyGhostCar(SpaceObject):
+    def __init__(self, car):
+        super(EfficiencyGhostCar, self).__init__(car.sim, "Ghost", car.pos, car.velocity)
+        self.car = car
+        self.time = 0 # Time to calculate efficiency with
+        self.start_pos = car.pos
+        self.distance = 0
+
+    def tick(self):
+        self.move()
+        if self.car.sensor.ped == None:
+            self.time += 1
+            return
+        if self.pos.x < self.car.sensor.ped.pos.x:
+            self.time += 1
+        self.distance = max(self.car.distance_to_ped_graph)
+
+    def get_efficiency_baseline(self):
+        """
+        Call this at the end of the simulation to get baseline for efficiency.
+        """
+        self.distance = max(self.car.distance_to_ped_graph)
+        return self.distance/(self.time/1000.0)
 
 
 class Car(SpaceObject):
@@ -180,14 +219,21 @@ class Car(SpaceObject):
         self.controller = Controller(self)
         self.sensor = Sensor(self)
         self.sensor_timer = 0
-        self.last_dist = None
         self.break_on = False
         self.acceleration_graph = list()
         self.distance_to_ped_graph = list()
-        self.time = 0 # time in ms
+        self.efficiency_time = 0 # to compare to ghost car
+        self.safety_buffer = 5 # Meters past ped.pos.x for declring safe passage
 
     def __str__(self):
-        return "Name: {}, Pos: {}, Vel: {}, Hit Ped: {}".format(self.name, self.pos, self.velocity, self.impact)
+        return "Name: {}, Pos: {}, Vel: {}, Hit Ped: {}".format(self.name, self.pos, self.velocity*1000.0, self.impact)
+
+    def effiency_calc(self):
+        if self.sensor.ped == None:
+            self.efficiency_time += 1
+            return
+        if self.pos.x < self.sensor.ped.pos.x:
+            self.efficiency_time += 1
 
     def tick_every_tick(self):
         """
@@ -196,6 +242,9 @@ class Car(SpaceObject):
         # move the car and change the velocity by some amount (optional)
         self.move()
         self.time += 1
+
+        # do effiency calculations.
+        self.effiency_calc()
 
         # document the cars acceleration
         acc = self.acceleration.speed()
@@ -207,16 +256,11 @@ class Car(SpaceObject):
             di = 0
         self.distance_to_ped_graph.append(di)
 
-        # stop the simulation once the distance between ped and the car gets further
-        # rather than closer -- The car has passed the ped safely
-        dist = self.sensor.get_distance()
-        if self.last_dist != None and dist < 10:
-            if dist > self.last_dist:
-                self.sim.stop()
-        self.last_dist = dist
-
         # check to see if impact with ped has occured after moving
         self.impact = self.sensor.check_impact()
+
+        # check to see if we have passed the pedestrian and the coast is clear
+        self.sensor.check_safe()
 
     def tick_sensor_packets(self):
         """

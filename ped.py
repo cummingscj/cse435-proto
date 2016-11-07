@@ -15,11 +15,8 @@ class Pedestrian(SpaceObject):
         super(Pedestrian, self).__init__(sim, name, pos, velocity)
 
     def __str__(self):
-        return "Name: {}, Pos: {}, Vel: {}, Dead: {}".format(self.name, self.pos, self.velocity, self.impact)
+        return "Name: {}, Pos: {}, Vel: {}, Dead: {}".format(self.name, self.pos, self.velocity*1000.0, self.impact)
 
     def tick(self):
         self.move()
-        self.change_velocity()
-
-    def change_velocity(self):
-        pass
+        self.time += 1

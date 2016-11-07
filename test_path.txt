@@ -1,0 +1,6 @@
+time:0 velx:0 vely:1.67
+time:1000 velx:2 vely:0
+time:1500 velx:0 vely:0
+time:3000 velx:0 vely:1.67
+time:5000 velx:1.67 vely:0
+time:6000 velx:0 vely:1.67
