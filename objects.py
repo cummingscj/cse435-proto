@@ -104,8 +104,8 @@ class SpaceObjectPath(object):
         self.name = name
         self.file = file
         self.path = list()
-        self.init_path()
         self.valid = False
+        self.init_path()
 
     def __str__(self):
         return '{->' + self.name + ": " + str(self.path) + '<-}'

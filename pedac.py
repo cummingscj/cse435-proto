@@ -128,6 +128,8 @@ class Simulation(object):
         Map the paths to the correct space objects.
         """
         for path in self.paths:
+            if not path.valid:
+                continue
             if path.name == self.car.name:
                 self.car.path = path
             elif path.name == self.pedestrian.name:
